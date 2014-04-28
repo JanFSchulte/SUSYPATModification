@@ -16,23 +16,26 @@ def addDefaultSUSYPAT(process,mcInfo=True,HLTMenu='HLT',jetMetCorrections=['L2Re
     loadPAT(process,jetMetCorrections,extMatch)
     addJetMET(process,theJetNames,jetMetCorrections,mcVersion)
     addType1MET(process)
+    #process.Tracer = cms.Service("Tracer")
+    process.options.allowUnscheduled = cms.untracked.bool( True )
+
     addMETFilters(process)    
     # loadType1METSequence(process)   # defines process.Type1METSequence
     # loadPATTriggers(process,HLTMenu,theJetNames,electronMatches,muonMatches,tauMatches,jetMatches,photonMatches)
 
     #-- Counter for the number of processed events --------------------------------
     process.eventCountProducer = cms.EDProducer("EventCountProducer")
-
+    getSUSY_pattuple_outputCommands(process)
     # Full path
     #process.load('RecoTauTag.Configuration.RecoPFTauTag_cff')
     process.susyPatDefaultSequence = cms.Sequence( process.eventCountProducer
                                                    
                                                    # * process.PFTau
                                                    # * process.Type1METSequence
-                                                   * process.patPF2PATSequence
-                                                   * process.patPF2PATSequencePF
-						   * process.filtersSeq
-						   * process.type1Sequence
+                                                   #* process.patPF2PATSequence
+                                                   #* process.patPF2PATSequencePF
+						   #* process.filtersSeq
+						   #* process.type1Sequence
                                                    )
 
     if mcInfo and extMatch:
@@ -63,7 +66,8 @@ def extensiveMatching(process):
 def loadPAT(process,jetMetCorrections,extMatch):
     #-- Changes for electron and photon ID ----------------------------------------
     from PhysicsTools.PatAlgos.tools.pfTools import usePFIso
-    usePFIso( process )
+    #adaptPFIsoElectrons(process,process.patElectrons, postfix = "PFIso", dR = "03")
+    usePFIso(process, postfix = "PFIso")
     process.patElectrons.isolationValues = cms.PSet(
         pfNeutralHadrons = cms.InputTag("elPFIsoValueNeutral03PFIdPFIso"),
         pfChargedAll = cms.InputTag("elPFIsoValueChargedAll03PFIdPFIso"),
@@ -77,10 +81,7 @@ def loadPAT(process,jetMetCorrections,extMatch):
         pfPUChargedHadrons = cms.InputTag("elPFIsoValuePU03NoPFIdPFIso"),
         pfPhotons = cms.InputTag("elPFIsoValueGamma03NoPFIdPFIso"),
         pfChargedHadrons = cms.InputTag("elPFIsoValueCharged03NoPFIdPFIso")
-        )
-    process.patDefaultSequence.replace(process.patElectrons,process.eleIsoSequence+process.patElectrons)
-    process.patDefaultSequence.replace(process.patMuons,process.muIsoSequence+process.patMuons)
-    
+        )    
     # Turn off photon-electron cleaning (i.e., flag only)
     process.cleanPatPhotons.checkOverlaps.electrons.requireNoOverlaps = False
 
@@ -163,7 +164,7 @@ def loadPAT(process,jetMetCorrections,extMatch):
     # apply FastJet corrections only if demanded
     # TODO: Check if still necessary to switch here
     if ("L1FastJet" in jetMetCorrections):
-        process.pfJets.doAreaFastjet = True
+        #process.pfJets.doAreaFastjet = True
         process.pfJetsPF.doAreaFastjet = True
 
 def loadPF2PAT(process,mcInfo,jetMetCorrections,extMatch,doSusyTopProjection,doType1MetCorrection,doType0MetCorrection,postfix):
@@ -177,7 +178,7 @@ def loadPF2PAT(process,mcInfo,jetMetCorrections,extMatch,doSusyTopProjection,doT
         jetAlgo             = 'AK5',
         runOnMC             = (mcInfo==1),
         postfix             = postfix,
-        jetCorrections      = ('AK5PFchs', jetMetCorrections),
+        jetCorrections      = ('AK5PFchs', jetMetCorrections,"None"),
         typeIMetCorrections = doType1MetCorrection)
 
     if doType0MetCorrection:
@@ -259,8 +260,8 @@ def loadPF2PAT(process,mcInfo,jetMetCorrections,extMatch,doSusyTopProjection,doT
     process.pfPileUpPF.Vertices = "goodVertices"
     process.pfPileUpPF.Enable = True
 
-    process.pfNoPileUpSequencePF.replace(process.pfPileUpPF,
-                                         process.goodVertices + process.pfPileUpPF)
+   # process.pfNoPileUpSequencePF.replace(process.pfPileUpPF,
+    #                                     process.goodVertices + process.pfPileUpPF)
 
     if not doSusyTopProjection:
         return
@@ -269,9 +270,9 @@ def loadPF2PAT(process,mcInfo,jetMetCorrections,extMatch,doSusyTopProjection,doT
     #relax all selectors *before* pat-lepton creation
     process.pfElectronsFromVertexPF.dzCut = 9999.0
     process.pfElectronsFromVertexPF.d0Cut = 9999.0
-    process.pfSelectedElectronsPF.cut = ""
-    process.pfRelaxedElectronsPF = process.pfIsolatedElectronsPF.clone(isolationCut = 3.)
-    process.pfIsolatedElectronsPF.isolationCut = 0.15
+    #process.pfSelectedElectronsPF.cut = ""
+    process.pfRelaxedElectronsPF = process.pfIsolatedElectronsPF.clone(cut = ' pt > 5 & gsfElectronRef.isAvailable() & gsfTrackRef.trackerExpectedHitsInner.numberOfLostHits<2 & gsfElectronRef.pfIsolationVariables().chargedHadronIso + gsfElectronRef.pfIsolationVariables().neutralHadronIso + gsfElectronRef.pfIsolationVariables().photonIso  < 3.0 * pt')
+    #process.pfIsolatedElectronsPF.isolationCut = 0.15
     
     process.pfElectronsFromGoodVertex = cms.EDFilter(
         "IPCutPFCandidateSelector",
@@ -292,19 +293,21 @@ def loadPF2PAT(process,mcInfo,jetMetCorrections,extMatch,doSusyTopProjection,doT
         src = cms.InputTag("pfElectronsFromGoodVertex"), #pfSelectedElectronsPF
         cut = cms.string(electronSelection)
     )    
-    process.pfElectronSequencePF.replace(process.pfIsolatedElectronsPF,
-                                         process.pfIsolatedElectronsPF + 
-                                         process.goodVertices * process.pfElectronsFromGoodVertex + 
-                                         process.pfUnclusteredElectronsPF + process.pfRelaxedElectronsPF)
+    #process.pfElectronSequencePF.replace(process.pfIsolatedElectronsPF,
+                                         #process.pfIsolatedElectronsPF + 
+                                         #process.goodVertices * process.pfElectronsFromGoodVertex + 
+                                         #process.pfUnclusteredElectronsPF + process.pfRelaxedElectronsPF)
     process.patElectronsPF.pfElectronSource = "pfRelaxedElectronsPF"
-    process.pfNoElectronPF.topCollection  = "pfUnclusteredElectronsPF"
+    #process.pfNoElectronPF.topCollection  = "pfUnclusteredElectronsPF" Does not work?
+    process.pfNoElectronPF.topCollection  = "pfRelaxedElectronsPF" 
+
     #Muons
     #relaxe built-in preselection
     process.pfMuonsFromVertexPF.dzCut = 9999.0
     process.pfMuonsFromVertexPF.d0Cut = 9999.0
-    process.pfSelectedMuonsPF.cut = ""
-    process.pfRelaxedMuonsPF = process.pfIsolatedMuonsPF.clone(isolationCut = 3)
-    process.pfIsolatedMuonsPF.isolationCut = 0.15
+    #process.pfSelectedMuonsPF.cut = ""
+    process.pfRelaxedMuonsPF = process.pfIsolatedMuonsPF.clone(cut = 'pt > 5 & muonRef.isAvailable() & muonRef.pfIsolationR04().sumChargedHadronPt + muonRef.pfIsolationR04().sumNeutralHadronEt + muonRef.pfIsolationR04().sumPhotonEt  < 0.15 * pt ')
+    #process.pfIsolatedMuonsPF.isolationCut = 0.15
     
     process.pfMuonsFromGoodVertex = cms.EDFilter(
         "IPCutPFCandidateSelector",
@@ -327,12 +330,13 @@ def loadPF2PAT(process,mcInfo,jetMetCorrections,extMatch,doSusyTopProjection,doT
         src = cms.InputTag("pfMuonsFromGoodVertex"), #pfSelectedMuonsPF
         cut = cms.string(muonSelection)
     )    
-    process.pfMuonSequencePF.replace(process.pfIsolatedMuonsPF,
-                                     process.pfIsolatedMuonsPF + 
-                                     process.goodVertices * process.pfMuonsFromGoodVertex +
-                                     process.pfUnclusteredMuonsPF + process.pfRelaxedMuonsPF)
+    #process.pfMuonSequencePF.replace(process.pfIsolatedMuonsPF,
+                                     #process.pfIsolatedMuonsPF + 
+                                     #process.goodVertices * process.pfMuonsFromGoodVertex +
+                                     #process.pfUnclusteredMuonsPF + process.pfRelaxedMuonsPF)
     process.patMuonsPF.pfMuonSource  = "pfRelaxedMuonsPF"
-    process.pfNoMuonPF.topCollection = "pfUnclusteredMuonsPF"
+    #process.pfNoMuonPF.topCollection = "pfUnclusteredMuonsPF" Does not work?
+    process.pfNoMuonOF.topCollection = "pfRelaxedMuonsPF"
     #Taus
     # TODO: Fix taus in 52X
     #process.pfTausPF.discriminators = cms.VPSet()
@@ -433,9 +437,10 @@ def addTypeIIMet(process) :
 
 def addTagInfos(process,jetMetCorrections):
     from PhysicsTools.PatAlgos.tools.jetTools import switchJetCollection
+    #print jetMetCorrections
     switchJetCollection( process,
-                     jetCollection=cms.InputTag('ak5CaloJets'),
-                     jetCorrLabel=('AK5Calo', jetMetCorrections))
+                     jetSource=cms.InputTag('ak5CaloJets'),
+                     jetCorrections=('AK5Calo', jetMetCorrections,"None"))
 
 def addSUSYJetCollection(process,jetMetCorrections,jets = 'IC5Calo',mcVersion='',doJTA=True,doType1MET=True,doJetID=True,jetIdLabel=None):
     from PhysicsTools.PatAlgos.tools.jetTools import addJetCollection
@@ -467,17 +472,23 @@ def addSUSYJetCollection(process,jetMetCorrections,jets = 'IC5Calo',mcVersion=''
         doJetID = False
     else: raise ValueError, "Unknown jet type: %s" % (jets)
     
-    addJetCollection(process, cms.InputTag(jetCollection),
-                     algorithm, type,
-                     doJTA            = doJTA,
-                     doBTagging       = True,
-                     jetCorrLabel     = jetCorrLabel,
-                     doType1MET       = doType1MET,
-                     doL1Cleaning     = True,
-                     doL1Counters     = True,
-                     doJetID          = doJetID,
-                     jetIdLabel       = jetIdLabel,
-                     genJetCollection = cms.InputTag('%(collection)sGenJets' % locals())
+    bTagDiscriminators = ['positiveOnlyJetProbabilityJetTags', 'softPFElectronByIP3dBJetTags', 'softPFMuonByIP3dBJetTags', 'simpleInclusiveSecondaryVertexHighPurBJetTags', 'negativeOnlyJetBProbabilityJetTags', 'negativeCombinedMVABJetTags', 'positiveSoftPFMuonByIP3dBJetTags', 'combinedSecondaryVertexMVABJetTags', 'positiveSoftPFElectronByPtBJetTags', 'trackCountingHighPurBJetTags', 'softPFMuonBJetTags', 'simpleSecondaryVertexHighPurBJetTags', 'jetBProbabilityBJetTags', 'trackCountingHighEffBJetTags', 'simpleInclusiveSecondaryVertexHighEffBJetTags', 'softPFElectronBJetTags', 'negativeTrackCountingHighPurJetTags', 'negativeSoftPFElectronByIP3dBJetTags', 'doubleSecondaryVertexHighEffBJetTags', 'positiveSoftPFElectronByIP2dBJetTags', 'negativeSoftPFMuonByIP3dBJetTags', 'positiveSoftPFElectronByIP3dBJetTags', 'positiveSoftPFElectronBJetTags', 'negativeSoftPFMuonByIP2dBJetTags', 'softPFMuonByIP2dBJetTags', 'positiveSoftPFMuonBJetTags', 'negativeSoftPFMuonBJetTags', 'combinedInclusiveSecondaryVertexBJetTags', 'jetProbabilityBJetTags', 'negativeOnlyJetProbabilityJetTags', 'combinedSecondaryVertexBJetTags', 'positiveCombinedMVABJetTags', 'negativeTrackCountingHighEffJetTags', 'positiveSoftPFMuonByIP2dBJetTags', 'positiveOnlyJetBProbabilityJetTags', 'simpleSecondaryVertexNegativeHighPurBJetTags', 'simpleSecondaryVertexNegativeHighEffBJetTags', 'None', 'negativeSoftPFElectronByIP2dBJetTags', 'softPFMuonByPtBJetTags', 'negativeSoftPFMuonByPtBJetTags', 'negativeSoftPFElectronBJetTags', 'simpleSecondaryVertexHighEffBJetTags', 'positiveSoftPFMuonByPtBJetTags', 'negativeSoftPFElectronByPtBJetTags', 'softPFElectronByPtBJetTags', 'combinedSecondaryVertexPositiveBJetTags', 'combinedSecondaryVertexNegativeBJetTags', 'softPFElectronByIP2dBJetTags', 'combinedInclusiveSecondaryVertexPositiveBJetTags']
+    
+    bTagInfo = ['impactParameterTagInfos', 'secondaryVertexTagInfos', 'secondaryVertexNegativeTagInfos', 'softMuonTagInfos', 'softPFMuonsTagInfos', 'softPFElectronsTagInfos', 'inclusiveSecondaryVertexFinderTagInfos', 'inclusiveSecondaryVertexFinderFilteredTagInfos']
+    
+    addJetCollection(process, jetSource = cms.InputTag(jetCollection),
+                     labelName = algorithm+type,
+                     jetTrackAssociation = doJTA,
+		     btagDiscriminators = bTagDiscriminators,
+		     btagInfos = bTagInfo,
+                     #doBTagging       = True,
+                     jetCorrections     = (algorithm+type, jetMetCorrections,"None"),
+                     #doType1MET       = doType1MET,
+                     #doL1Cleaning     = True,
+                     #doL1Counters     = True,
+                     #doJetID          = doJetID,
+                     #jetIdLabel       = jetIdLabel,
+                     #genJetCollection = cms.InputTag('%(collection)sGenJets' % locals())
                      )
 
 def addJetMET(process,theJetNames,jetMetCorrections,mcVersion):
@@ -496,27 +507,34 @@ def addJetMET(process,theJetNames,jetMetCorrections,mcVersion):
     theJetNames.pop()
     
     # Add tcMET
-    from PhysicsTools.PatAlgos.tools.metTools import addTcMET #, addPfMET
-    addTcMET(process,'TC')
+    from PhysicsTools.PatAlgos.tools.metTools import addMETCollection #, addPfMET
+    addMETCollection(process,
+    		     labelName="patMETsTC",
+		     metSource="tcMet",
+		     )
+    module = getattr(process,"patMETsTC")
+    
+    process.patMETsTC.addMuonCorrections = True
     #addPfMET(process,'PF') #is in PF2PAT
 
     # Rename default jet collection for uniformity
-    process.cleanPatJetsAK5Calo = process.cleanPatJets
-    process.patMETsAK5Calo      = process.patMETs
+    #process.cleanPatJetsAK5Calo = process.cleanPatJets
+    #process.patMETsAK5Calo      = process.patMETs
     
     # TODO: fix type2 MET in 52X
     #addTypeIIMet(process)
-
+    process.cleanPatJetsAK5Calo = process.cleanPatJets.clone()
+    process.patMETsAK5Calo      = process.patMETs.clone()
     # Modify subsequent modules
-    process.patHemispheres.patJets = process.cleanPatJetsAK5Calo.label()
-    process.countPatJets.src       = process.cleanPatJetsAK5Calo.label()
+    process.patHemispheres.patJets = process.cleanPatJets.label()
+    process.countPatJets.src       = process.cleanPatJets.label()
     
     # Modify counters' input
-    process.patCandidateSummary.candidates.remove(cms.InputTag('patMETs'))
-    process.patCandidateSummary.candidates.append(cms.InputTag('patMETsAK5Calo'))
+    #process.patCandidateSummary.candidates.remove(cms.InputTag('patMETs'))
+    #process.patCandidateSummary.candidates.append(cms.InputTag('patMETsAK5Calo'))
     process.patCandidateSummary.candidates.append(cms.InputTag('patMHTsAK5Calo'))
-    process.cleanPatCandidateSummary.candidates.remove(cms.InputTag('cleanPatJets'))
-    process.cleanPatCandidateSummary.candidates.append(cms.InputTag('cleanPatJetsAK5Calo'))
+    #process.cleanPatCandidateSummary.candidates.remove(cms.InputTag('cleanPatJets'))
+    #process.cleanPatCandidateSummary.candidates.append(cms.InputTag('cleanPatJetsAK5Calo'))
     # Add new jet collections to counters (MET done automatically)
     for jets in theJetNames: 
         process.patCandidateSummary.candidates.append(cms.InputTag('patJets'+jets))
@@ -550,6 +568,9 @@ def getSUSY_pattuple_outputCommands( process ):
     'keep *_selectedPatElectronsPF_*_*',         
     'keep *_selectedPatTausPF_*_*',         
     'keep *_selectedPatJetsPF_*_*',
+    'keep *_cleanPatMuons_*_*',
+    'keep *_cleanPatElectrons_*_*',
+    #'keep *_selectedPatMuonsPF_*_*'
     #L1 trigger info         
     'keep L1GlobalTriggerObjectMapRecord_*_*_*',
     'keep L1GlobalTriggerReadoutRecord_*_*_*',
@@ -579,6 +600,9 @@ def getSUSY_pattuple_outputCommands( process ):
     'drop recoTracks_generalTracks*_*_*',
     'drop *_towerMaker_*_*',
     'keep *_pfType1CorrectedMet*_*_*',
+    'keep *_beamHaloFilter_*_*',
+    'keep *_EcalDeadCellTriggerPrimitiveFilter_*_*',
+    'keep *_*CSC*_*_*',
     ]
     keepList.extend(patEventContent)
     keepList.extend(patExtraAodEventContent)
@@ -607,36 +631,36 @@ def addMETFilters( process ):
     	)
 	
 	
-	process.load('RecoMET.METAnalyzers.CSCHaloFilter_cfi')
-	process.CSCTightHaloFilter.taggingMode=cms.bool(False)
+	process.load('RecoMET.METFilters.CSCTightHaloFilter_cfi')
+	process.CSCTightHaloFilter.taggingMode=cms.bool(True)
 	process.load("CommonTools.RecoAlgos.HBHENoiseFilterResultProducer_cfi")
 	process.load("RecoMET.METFilters.hcalLaserEventFilter_cfi")
 	#process.hcalLaserEventFilter.vetoByRunEventNumber=cms.untracked.bool(False)
 	#process.hcalLaserEventFilter.vetoByHBHEOccupancy=cms.untracked.bool(True)
-	process.hcalLaserEventFilter.taggingMode=cms.bool(False)
+	process.hcalLaserEventFilter.taggingMode=cms.bool(True)
 	process.load('RecoMET.METFilters.EcalDeadCellTriggerPrimitiveFilter_cfi')
-	process.EcalDeadCellTriggerPrimitiveFilter.taggingMode=cms.bool(False)
+	process.EcalDeadCellTriggerPrimitiveFilter.taggingMode=cms.bool(True)
 	#process.EcalDeadCellTriggerPrimitiveFilter.tpDigiCollection = cms.InputTag("ecalTPSkimNA")
 	process.load('RecoMET.METFilters.eeBadScFilter_cfi')
-	process.eeBadScFilter.taggingMode=cms.bool(False)
+	process.eeBadScFilter.taggingMode=cms.bool(True)
 	process.load('RecoMET.METFilters.trackingFailureFilter_cfi')
-	process.trackingFailureFilter.taggingMode=cms.bool(False)
-	process.load('RecoMET.METFilters.trackingPOGFilters_cff')
+	process.trackingFailureFilter.taggingMode=cms.bool(True)
+	#process.load('RecoMET.METFilters.trackingPOGFilters_cff')
 	process.load("EventFilter.HcalRawToDigi.hcallasereventfilter2012_cfi")	
 
 	
-	process.filtersSeq = cms.Sequence(
-   		process.primaryVertexFilter *
-  		process.noscraping *
-		process.CSCTightHaloFilter *
-		process.HBHENoiseFilterResultProducer*
-   		process.hcalLaserEventFilter *
-		process.hcallasereventfilter2012 *
-   		process.EcalDeadCellTriggerPrimitiveFilter *
-   		process.goodVertices * process.trackingFailureFilter *
-   		process.eeBadScFilter *
-		process.trkPOGFilters
-	)
+	#process.filtersSeq = cms.Sequence(
+   		#process.primaryVertexFilter *
+  		#process.noscraping *
+		#process.CSCTightHaloFilter *
+		#process.HBHENoiseFilterResultProducer*
+   		#process.hcalLaserEventFilter *
+		#process.hcallasereventfilter2012 *
+   		#process.EcalDeadCellTriggerPrimitiveFilter *
+   		#process.goodVertices * process.trackingFailureFilter *
+   		#process.eeBadScFilter 
+		##process.trkPOGFilters
+	#)
 
 
 def addType1MET ( process ):

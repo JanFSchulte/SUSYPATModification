@@ -103,6 +103,7 @@ if options.addKeep:
 #-- Execution path ------------------------------------------------------------
 # Full path
 process.p = cms.Path( process.susyPatDefaultSequence )
+process.options.allowUnscheduled = cms.untracked.bool( True )
 #-- Dump config ------------------------------------------------------------
 file = open('SusyPAT_cfg.py','w')
 file.write(str(process.dumpPython()))
