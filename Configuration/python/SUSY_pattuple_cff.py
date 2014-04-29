@@ -336,7 +336,7 @@ def loadPF2PAT(process,mcInfo,jetMetCorrections,extMatch,doSusyTopProjection,doT
                                      #process.pfUnclusteredMuonsPF + process.pfRelaxedMuonsPF)
     process.patMuonsPF.pfMuonSource  = "pfRelaxedMuonsPF"
     #process.pfNoMuonPF.topCollection = "pfUnclusteredMuonsPF" Does not work?
-    process.pfNoMuonOF.topCollection = "pfRelaxedMuonsPF"
+    process.pfNoMuonPF.topCollection = "pfRelaxedMuonsPF"
     #Taus
     # TODO: Fix taus in 52X
     #process.pfTausPF.discriminators = cms.VPSet()
