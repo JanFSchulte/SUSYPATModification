@@ -1,3 +1,4 @@
+# -*- coding: iso-8859-1 -*-
 #
 #  SUSY-PAT configuration fragment
 #
@@ -65,23 +66,23 @@ def extensiveMatching(process):
 
 def loadPAT(process,jetMetCorrections,extMatch):
     #-- Changes for electron and photon ID ----------------------------------------
-    from PhysicsTools.PatAlgos.tools.pfTools import usePFIso
+    #from PhysicsTools.PatAlgos.tools.pfTools import usePFIso
     #adaptPFIsoElectrons(process,process.patElectrons, postfix = "PFIso", dR = "03")
-    usePFIso(process, postfix = "PFIso")
-    process.patElectrons.isolationValues = cms.PSet(
-        pfNeutralHadrons = cms.InputTag("elPFIsoValueNeutral03PFIdPFIso"),
-        pfChargedAll = cms.InputTag("elPFIsoValueChargedAll03PFIdPFIso"),
-        pfPUChargedHadrons = cms.InputTag("elPFIsoValuePU03PFIdPFIso"),
-        pfPhotons = cms.InputTag("elPFIsoValueGamma03PFIdPFIso"),
-        pfChargedHadrons = cms.InputTag("elPFIsoValueCharged03PFIdPFIso")
-        )
-    process.patElectrons.isolationValuesNoPFId = cms.PSet(
-        pfNeutralHadrons = cms.InputTag("elPFIsoValueNeutral03NoPFIdPFIso"),
-        pfChargedAll = cms.InputTag("elPFIsoValueChargedAll03NoPFIdPFIso"),
-        pfPUChargedHadrons = cms.InputTag("elPFIsoValuePU03NoPFIdPFIso"),
-        pfPhotons = cms.InputTag("elPFIsoValueGamma03NoPFIdPFIso"),
-        pfChargedHadrons = cms.InputTag("elPFIsoValueCharged03NoPFIdPFIso")
-        )    
+    #usePFIso(process, postfix = "PFIso")
+    #process.patElectrons.isolationValues = cms.PSet(
+        #pfNeutralHadrons = cms.InputTag("elPFIsoValueNeutral03PFIdPFIso"),
+        #pfChargedAll = cms.InputTag("elPFIsoValueChargedAll03PFIdPFIso"),
+        #pfPUChargedHadrons = cms.InputTag("elPFIsoValuePU03PFIdPFIso"),
+        #pfPhotons = cms.InputTag("elPFIsoValueGamma03PFIdPFIso"),
+        #pfChargedHadrons = cms.InputTag("elPFIsoValueCharged03PFIdPFIso")
+        #)
+    #process.patElectrons.isolationValuesNoPFId = cms.PSet(
+        #pfNeutralHadrons = cms.InputTag("elPFIsoValueNeutral03NoPFIdPFIso"),
+        #pfChargedAll = cms.InputTag("elPFIsoValueChargedAll03NoPFIdPFIso"),
+        #pfPUChargedHadrons = cms.InputTag("elPFIsoValuePU03NoPFIdPFIso"),
+        #pfPhotons = cms.InputTag("elPFIsoValueGamma03NoPFIdPFIso"),
+        #pfChargedHadrons = cms.InputTag("elPFIsoValueCharged03NoPFIdPFIso")
+        #)    
     # Turn off photon-electron cleaning (i.e., flag only)
     process.cleanPatPhotons.checkOverlaps.electrons.requireNoOverlaps = False
 
@@ -95,26 +96,7 @@ def loadPAT(process,jetMetCorrections,extMatch):
     #process.makePatTaus.replace( process.patTaus, process.shrinkingConePFTauDecayModeProducer + process.patTaus )
 
     #Additional electron ids as defined for VBTF
-    process.load("ElectroWeakAnalysis.WENu.simpleEleIdSequence_cff")
-    process.patElectrons.electronIDSources = cms.PSet(
-    eidTight = cms.InputTag("eidTight"),
-    eidLoose = cms.InputTag("eidLoose"),
-    eidRobustTight = cms.InputTag("eidRobustTight"),
-    eidRobustHighEnergy = cms.InputTag("eidRobustHighEnergy"),
-    eidRobustLoose = cms.InputTag("eidRobustLoose"),
-    simpleEleId95relIso= cms.InputTag("simpleEleId95relIso"),
-    simpleEleId90relIso= cms.InputTag("simpleEleId90relIso"),
-    simpleEleId85relIso= cms.InputTag("simpleEleId85relIso"),
-    simpleEleId80relIso= cms.InputTag("simpleEleId80relIso"),
-    simpleEleId70relIso= cms.InputTag("simpleEleId70relIso"),
-    simpleEleId60relIso= cms.InputTag("simpleEleId60relIso"),
-    simpleEleId95cIso= cms.InputTag("simpleEleId95cIso"),
-    simpleEleId90cIso= cms.InputTag("simpleEleId90cIso"),
-    simpleEleId85cIso= cms.InputTag("simpleEleId85cIso"),
-    simpleEleId80cIso= cms.InputTag("simpleEleId80cIso"),
-    simpleEleId70cIso= cms.InputTag("simpleEleId70cIso"),
-    simpleEleId60cIso= cms.InputTag("simpleEleId60cIso"))
-    process.patDefaultSequence.replace(process.patElectrons,process.simpleEleIdSequence+process.patElectrons)
+
     
     #-- Tuning of Monte Carlo matching --------------------------------------------
     # Also match with leptons of opposite charge
@@ -179,7 +161,8 @@ def loadPF2PAT(process,mcInfo,jetMetCorrections,extMatch,doSusyTopProjection,doT
         runOnMC             = (mcInfo==1),
         postfix             = postfix,
         jetCorrections      = ('AK5PFchs', jetMetCorrections,"None"),
-        typeIMetCorrections = doType1MetCorrection)
+        typeIMetCorrections = doType1MetCorrection,
+		pvCollection=cms.InputTag('goodOfflinePrimaryVerticesPF',))
 
     if doType0MetCorrection:
         getattr(process,'patType1CorrectedPFMet'+postfix).srcType1Corrections = cms.VInputTag(
@@ -271,7 +254,7 @@ def loadPF2PAT(process,mcInfo,jetMetCorrections,extMatch,doSusyTopProjection,doT
     process.pfElectronsFromVertexPF.dzCut = 9999.0
     process.pfElectronsFromVertexPF.d0Cut = 9999.0
     #process.pfSelectedElectronsPF.cut = ""
-    process.pfRelaxedElectronsPF = process.pfIsolatedElectronsPF.clone(cut = ' pt > 5 & gsfElectronRef.isAvailable() & gsfTrackRef.trackerExpectedHitsInner.numberOfLostHits<2 & gsfElectronRef.pfIsolationVariables().chargedHadronIso + gsfElectronRef.pfIsolationVariables().neutralHadronIso + gsfElectronRef.pfIsolationVariables().photonIso  < 3.0 * pt')
+    process.pfRelaxedElectronsPF = process.pfIsolatedElectronsPF.clone(cut = ' pt > 5 & gsfElectronRef.isAvailable() & gsfTrackRef.trackerExpectedHitsInner.numberOfLostHits<2 & gsfElectronRef.pfIsolationVariables().sumChargedHadronPt + gsfElectronRef.pfIsolationVariables().sumNeutralHadronEt  + gsfElectronRef.pfIsolationVariables().sumPhotonEt < 3.0 * pt')
     #process.pfIsolatedElectronsPF.isolationCut = 0.15
     
     process.pfElectronsFromGoodVertex = cms.EDFilter(
