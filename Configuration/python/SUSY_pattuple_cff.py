@@ -8,7 +8,7 @@
 
 import FWCore.ParameterSet.Config as cms
 
-def addDefaultSUSYPAT(process,mcInfo=True,HLTMenu='HLT',jetMetCorrections=['L2Relative', 'L3Absolute'],mcVersion='',theJetNames = ['AK5PF'],doValidation=False,extMatch=False,doSusyTopProjection=False,doType1MetCorrection=True,doType0MetCorrection=False):
+def addDefaultSUSYPAT(process,mcInfo=True,HLTMenu='HLT',jetMetCorrections=['L2Relative', 'L3Absolute'],mcVersion='',theJetNames = ['AK5PF'],doValidation=False,extMatch=False,doSusyTopProjection=False,doType1MetCorrection=True,doType0MetCorrection=False,useMETFilters=True):
     loadPF2PAT(process,mcInfo,jetMetCorrections,extMatch,doSusyTopProjection,doType1MetCorrection,doType0MetCorrection,'PF')
     addTagInfos(process,jetMetCorrections)
     if not mcInfo:
@@ -16,7 +16,9 @@ def addDefaultSUSYPAT(process,mcInfo=True,HLTMenu='HLT',jetMetCorrections=['L2Re
     loadPAT(process,jetMetCorrections,extMatch)
     addJetMET(process,theJetNames,jetMetCorrections,mcVersion)
     addType1MET(process)
-    addMETFilters(process)    
+    if useMETFilters:
+    	addMETFilters(process)
+    #doMETStuff(process)    
     # loadType1METSequence(process)   # defines process.Type1METSequence
     # loadPATTriggers(process,HLTMenu,theJetNames,electronMatches,muonMatches,tauMatches,jetMatches,photonMatches)
 
@@ -31,10 +33,20 @@ def addDefaultSUSYPAT(process,mcInfo=True,HLTMenu='HLT',jetMetCorrections=['L2Re
                                                    # * process.Type1METSequence
                                                    * process.patPF2PATSequence
                                                    * process.patPF2PATSequencePF
-						   * process.filtersSeq
 						   * process.type1Sequence
+						   #* process.metStuffSequence
                                                    )
-
+    if useMETFilters:
+	process.susyPatDefaultSequence = cms.Sequence( process.eventCountProducer
+							
+							# * process.PFTau
+							# * process.Type1METSequence
+							* process.patPF2PATSequence
+							* process.patPF2PATSequencePF
+							* process.filtersSeq
+							* process.type1Sequence
+							#* process.metStuffSequence
+							)	    	
     if mcInfo and extMatch:
         extensiveMatching(process)
         process.susyPatDefaultSequence.replace(process.patDefaultSequence, process.extensiveMatching+process.patDefaultSequence)
@@ -78,6 +90,15 @@ def loadPAT(process,jetMetCorrections,extMatch):
         pfPhotons = cms.InputTag("elPFIsoValueGamma03NoPFIdPFIso"),
         pfChargedHadrons = cms.InputTag("elPFIsoValueCharged03NoPFIdPFIso")
         )
+	
+    process.patMuons.isolationValues = cms.PSet(
+        pfNeutralHadrons = cms.InputTag("muPFIsoValueNeutral03PFIso"),
+        pfChargedAll = cms.InputTag("muPFIsoValueChargedAll03PFIso"),
+        pfPUChargedHadrons = cms.InputTag("muPFIsoValuePU03PFIso"),
+        pfPhotons = cms.InputTag("muPFIsoValueGamma03PFIso"),
+        pfChargedHadrons = cms.InputTag("muPFIsoValueCharged03PFIso")
+        )
+	
     process.patDefaultSequence.replace(process.patElectrons,process.eleIsoSequence+process.patElectrons)
     process.patDefaultSequence.replace(process.patMuons,process.muIsoSequence+process.patMuons)
     
@@ -579,6 +600,7 @@ def getSUSY_pattuple_outputCommands( process ):
     'drop recoTracks_generalTracks*_*_*',
     'drop *_towerMaker_*_*',
     'keep *_pfType1CorrectedMet*_*_*',
+    #'keep *_*Met*_*_*',    
     ]
     keepList.extend(patEventContent)
     keepList.extend(patExtraAodEventContent)
@@ -638,6 +660,13 @@ def addMETFilters( process ):
 		process.trkPOGFilters
 	)
 
+
+def doMETStuff( process ):
+	from PhysicsTools.PatUtils.tools.metUncertaintyTools import runMEtUncertainties
+	runMEtUncertainties(process,jetCollection="selectedPatJetsAK5PF")
+	#process.metStuffSequence = cms.Sequence(
+		#process.runMEtUncertainties
+	#)
 
 def addType1MET ( process ):
 	process.load("JetMETCorrections.Type1MET.pfMETCorrections_cff")
